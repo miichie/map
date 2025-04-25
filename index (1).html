@@ -1,0 +1,133 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>ParkSmart Map - Live Buchung & Zeitlimit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  ></script>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: #e8f5e9;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    .leaflet-popup-content-wrapper {
+      background-color: #c8e6c9;
+      color: #2e7d32;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+    }
+    button {
+      background-color: #2e7d32;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 5px;
+    }
+    button:hover {
+      background-color: #1b5e20;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://kaxqdxqlxcnhqtxkhamk.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHFkeHFseGNuaHF0eGtoYW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1Njc4MDIsImV4cCI6MjA2MTE0MzgwMn0.hZDgIaLYBVhb9G_TxOZ_3zW3Ny9i9NMFn-7ueyiHK8c';
+
+    var map = L.map('map').setView([47.44, 12.76], 14);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    const parkplaetze = {
+      Ullach28: [47.445805, 12.768481],
+      Leogang62: [47.439317, 12.761444]
+    };
+
+    // Parkplätze laden und prüfen
+    async function ladeParkplaetze() {
+      for (const platz in parkplaetze) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings?platz_id=eq.${platz}&select=status,valid_until`, {
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`
+          }
+        });
+        const daten = await res.json();
+        let status = "frei";
+        if (daten.length > 0) {
+          const booking = daten[0];
+          if (booking.valid_until && new Date(booking.valid_until) > new Date()) {
+            status = booking.status;
+          }
+        }
+        addMarker(platz, parkplaetze[platz], status, daten[0]?.valid_until);
+      }
+    }
+
+    // Marker setzen
+    function addMarker(platz, coords, status, validUntil) {
+      let popupContent = `<b>Parkplatz ${platz}</b><br>Status: ${status}`;
+      if (status === "frei") {
+        popupContent += `<br><button onclick="buchePlatz('${platz}')">Buchen</button>`;
+      } else if (validUntil) {
+        const endTime = new Date(validUntil).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        popupContent += `<br>Reserviert bis ${endTime}<br><button disabled>Belegt</button>`;
+      } else {
+        popupContent += `<br><button disabled>Belegt</button>`;
+      }
+
+      L.marker(coords).addTo(map)
+        .bindPopup(popupContent);
+    }
+
+    // Platz buchen
+    async function buchePlatz(platz) {
+      const jetzt = new Date();
+      const in30Minuten = new Date(jetzt.getTime() + 30 * 60000);
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          platz_id: platz,
+          status: 'reserviert',
+          valid_until: in30Minuten.toISOString()
+        })
+      });
+
+      if (res.ok) {
+        alert(`Parkplatz ${platz} erfolgreich reserviert!`);
+        location.reload();
+      } else {
+        alert("Buchung fehlgeschlagen!");
+      }
+    }
+
+    // Initiale Ladung
+    ladeParkplaetze();
+
+  </script>
+</body>
+</html>
