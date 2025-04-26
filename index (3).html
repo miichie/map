@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>ParkSmart - Parkplatz anbieten</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #e8f5e9; }
+    #map { height: 60vh; width: 100%; }
+    .form-container { padding: 20px; background: #fff; border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); margin-top: -30px; }
+    .form-container h2 { margin-top: 0; }
+    label { display: block; margin: 10px 0 5px; }
+    input, textarea { width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    button { background: #2e7d32; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+    button:hover { background: #1b5e20; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div class="form-container">
+    <h2>Parkplatz anbieten</h2>
+    <form id="offerForm">
+      <label>Parkplatzname</label>
+      <input type="text" id="name" required>
+      <label>Koordinaten (Latitude, Longitude)</label>
+      <input type="text" id="coords" placeholder="z.B. 47.445801, 12.768470" required>
+      <label>Preis pro Stunde (€)</label>
+      <input type="number" step="0.01" id="price" required>
+      <label>Beschreibung (optional)</label>
+      <textarea id="description"></textarea>
+
+      <h3>Eigenbedarfzeiten (optional)</h3>
+      <label>Montag (z.B. 17:00-08:00)</label>
+      <input type="text" id="mon">
+      <label>Dienstag</label>
+      <input type="text" id="tue">
+      <label>Mittwoch</label>
+      <input type="text" id="wed">
+      <label>Donnerstag</label>
+      <input type="text" id="thu">
+      <label>Freitag</label>
+      <input type="text" id="fri">
+      <label>Samstag</label>
+      <input type="text" id="sat">
+      <label>Sonntag</label>
+      <input type="text" id="sun">
+
+      <h3>Sondertage blockieren</h3>
+      <label>Blockiertage (YYYY-MM-DD, mehrere durch Komma trennen)</label>
+      <input type="text" id="blocked_days">
+
+      <button type="submit">Parkplatz speichern</button>
+    </form>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://kaxqdxqlxcnhqtxkhamk.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtheHFkeHFseGNuaHF0eGtoYW1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1Njc4MDIsImV4cCI6MjA2MTE0MzgwMn0.hZDgIaLYBVhb9G_TxOZ_3zW3Ny9i9NMFn-7ueyiHK8c';
+
+    const map = L.map('map').setView([47.44, 12.76], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Lade alle vorhandenen Parkplätze
+    async function ladeParkplaetze() {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/available_spots`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      const spots = await res.json();
+      spots.forEach(spot => {
+        let status = 'Frei';
+        if (spot.eigenbedarf || spot.blocked_days.length > 0) {
+          status = 'Verfügbarkeit prüfen';
+        }
+        L.marker([spot.latitude, spot.longitude])
+          .addTo(map)
+          .bindPopup(`<b>${spot.name}</b><br>Preis: €${spot.price_per_hour}/h<br>${spot.description || ''}<br>Status: ${status}`);
+      });
+    }
+
+    ladeParkplaetze();
+
+    document.getElementById('offerForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const coordsInput = document.getElementById('coords').value.trim();
+      if (!coordsInput.includes(',')) {
+        alert('Bitte gib die Koordinaten im Format "Latitude, Longitude" ein!');
+        return;
+      }
+      const [latitude, longitude] = coordsInput.split(',').map(x => parseFloat(x.trim()));
+
+      if (isNaN(latitude) || isNaN(longitude)) {
+        alert('Ungültige Koordinaten eingegeben!');
+        return;
+      }
+
+      const eigenbedarf = {
+        monday: document.getElementById('mon').value,
+        tuesday: document.getElementById('tue').value,
+        wednesday: document.getElementById('wed').value,
+        thursday: document.getElementById('thu').value,
+        friday: document.getElementById('fri').value,
+        saturday: document.getElementById('sat').value,
+        sunday: document.getElementById('sun').value
+      };
+
+      const blockedDays = document.getElementById('blocked_days').value
+        .split(',')
+        .map(day => day.trim())
+        .filter(day => day);
+
+      const data = {
+        name: document.getElementById('name').value,
+        latitude: latitude,
+        longitude: longitude,
+        price_per_hour: parseFloat(document.getElementById('price').value),
+        description: document.getElementById('description').value,
+        eigenbedarf: eigenbedarf,
+        blocked_days: blockedDays
+      };
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/available_spots`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        alert('Parkplatz erfolgreich gespeichert!');
+        document.getElementById('offerForm').reset();
+        location.reload();
+      } else {
+        alert('Fehler beim Speichern!');
+      }
+    });
+  </script>
+</body>
+</html>
