@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Parkplatz finden – ParkSmart</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #333;
+      line-height: 1.6;
+    }
+    #map {
+      height: 60vh;
+      width: 100%;
+    }
+    .button-bar {
+      text-align: center;
+      margin: 10px;
+    }
+    button {
+      background: #2e7d32;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #1b5e20;
+    }
+    .form-container {
+      display: none;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    .form-container.active {
+      display: block;
+    }
+    .form-container h2 {
+      margin-top: 0;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #loader {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #2e7d32;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      z-index: 10000;
+    }
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+
+<nav>
+  <ul>
+    <li><a href="home.html">Home</a></li>
+    <li><a href="index.html">Parkplatz finden</a></li>
+    <li><a href="impressum.html">Impressum</a></li>
+    <li><a href="datenschutz.html">Datenschutz</a></li>
+  </ul>
+</nav>
+<style>
+  nav {
+    background: #2e7d32;
+    padding: 10px 0;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+  }
+  nav ul {
+    list-style: none;
+    display: flex;
+    justify-content: center;
+    margin: 0;
+    padding: 0;
+    flex-wrap: wrap;
+  }
+  nav li {
+    margin: 0 15px;
+  }
+  nav a {
+    color: white;
+    text-decoration: none;
+    font-size: 1.1em;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  nav a:hover {
+    color: #c8e6c9;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+</style>
+
+
+<div id="map"></div>
+
+<div class="button-bar">
+  <button onclick="zeigeOfferForm()">Ich will einen Parkplatz anbieten</button>
+</div>
+
+<div class="form-container" id="offerFormContainer">
+  <h2>Parkplatz anbieten</h2>
+  <form id="offerForm">
+    <label>Parkplatzname</label>
+    <input type="text" id="name" required>
+    <label>Koordinaten (Latitude, Longitude)</label>
+    <input type="text" id="coords" placeholder="z.B. 47.445801, 12.768470" required>
+    <label>Preis pro Stunde (€)</label>
+    <input type="number" step="0.01" id="price" required>
+    <label>Beschreibung (optional)</label>
+    <textarea id="description"></textarea>
+    <button type="submit">Parkplatz speichern</button>
+    <button type="button" onclick="schliesseOfferForm()">Abbrechen</button>
+  </form>
+</div>
+
+<div id="loader"></div>
+
+<script>
+// Karte initialisieren
+var map = L.map('map').setView([47.445801, 12.768470], 14);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap-Mitwirkende'
+}).addTo(map);
+
+// Funktionen zum Anzeigen/Schließen des Formulars
+function zeigeOfferForm() {
+  document.getElementById('offerFormContainer').classList.add('active');
+}
+function schliesseOfferForm() {
+  document.getElementById('offerFormContainer').classList.remove('active');
+}
+</script>
+
+</body>
+</html>
